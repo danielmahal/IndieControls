@@ -1,5 +1,5 @@
 int in = 3;
-int pot = 2;
+int pot = A1;
 int out = 0;
 boolean inConnected = false;
 
@@ -40,7 +40,7 @@ void loop() {
 //  int value = (float(compound - (idIn * 50)) / 50.0) * 255.0;
 //  values[1] = getPulseIn();
   
-//  values[0] = (float(analogRead(pot)) / 1024.0) * 255;
+  values[0] = (float(analogRead(pot)) / 1024.0) * 255.0;
   
   // Out
   idOut++;
