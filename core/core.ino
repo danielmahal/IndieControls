@@ -9,7 +9,7 @@ void loop() {
   int pulseTimeout = 256 * 60 * 2;
   int raw = floor(float(pulseIn(in, HIGH, pulseTimeout) / 256.0 / 60) * 255);
   int i = floor(raw / 50);
-  int value = raw;
+  int value = (float(raw - (i * 50)) / 50.0) * 255.0;
 
   Serial.print(i);
   Serial.print(": ");
