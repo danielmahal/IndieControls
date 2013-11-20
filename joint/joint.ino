@@ -1,6 +1,6 @@
 int out = 0;
 
-int i = 1;
+int i = 0;
 
 void setup() {
   pinMode(out, OUTPUT);
@@ -10,7 +10,7 @@ void loop() {
   i++;
   
   if(i > 5) {
-    i = 1;
+    i = 0;
   }
   
   analogWrite(out, i * 50);
