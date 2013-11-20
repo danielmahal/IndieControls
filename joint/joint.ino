@@ -10,4 +10,3 @@ void loop() {
   int val = map(analogRead(pot), 0, 1023, 1, 255);
   analogWrite(out, val);
 }
-
