@@ -1,0 +1,53 @@
+<html>
+<head>
+    <title>Pot Modules</title>
+</head>
+<body>
+    <div id="value-1"></div>
+    <div id="value-2"></div>
+
+    <canvas id="canvas"></canvas>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        var canvas = document.getElementById('canvas');
+        var context = canvas.getContext('2d');
+        var socket = io.connect('http://localhost');
+
+        var divs = [
+            document.getElementById('value-1'),
+            document.getElementById('value-2')
+        ];
+
+        var targetValues = [0, 0];
+        var values = [0, 0];
+
+        socket.on('update', function(data) {
+            targetValues[data.id] = data.value;
+        });
+
+        function loop() {
+            canvas.width = canvas.width;
+
+            var offset = { x:0, y:0, angle: 0 };
+
+            for(var i = 0; i < values.length; i++) {
+                values[i] += (targetValues[i] - values[i]) * 0.2;
+                divs[i].innerHTML = parseInt(values[i], 10);
+
+                var angle = values[i] * 0.0174532925;
+                var x = canvas.width / 2;
+                var y = canvas.height / 2;
+                context.moveTo(x, y);
+                context.lineTo(x + Math.cos(angle) * 50, y+  Math.sin(angle) * 50);
+                context.stroke();
+                context.restore();
+            }
+
+            window.requestAnimationFrame(loop);
+        }
+
+        loop();
+    </script>
+</body>
+</html>
