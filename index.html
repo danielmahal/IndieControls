@@ -34,7 +34,7 @@
         });
 
         socket.on('update', function(data) {
-            targetValues[data.id] = data.value;
+            targetValues[data.id] = data.value / 1024 * (Math.PI * 2);
         });
 
         function loop() {
@@ -43,10 +43,10 @@
             var offset = { x:0, y:0, angle: 0 };
 
             for(var i = 0; i < values.length; i++) {
-                values[i] += (targetValues[i] - values[i]) * 0.2;
+                values[i] += (targetValues[i] - values[i]) * 1;
                 divs[i].innerHTML = parseInt(values[i], 10);
 
-                var angle = (values[i] * 0.0174532925) + offset.angle;
+                var angle = values[i] + offset.angle;
                 var x = (canvas.width / 2) + offset.x;
                 var y = (canvas.height / 2) + offset.y;
                 context.moveTo(x, y);

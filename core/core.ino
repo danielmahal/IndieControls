@@ -1,21 +1,27 @@
-int in = A0;
+String inputString = "";
+boolean stringComplete = false;
 
 void setup() {
-  Serial.begin(9600);
-  pinMode(in, INPUT);
+  Serial.begin(300);
+  inputString.reserve(200);
 }
 
 void loop() {
-  int pulseTimeout = 256 * 60 * 2;
-  
-  int raw = floor(float(pulseIn(in, HIGH, pulseTimeout) / 256.0 / 60) * 255);
+  if (stringComplete) {
+    Serial.println(inputString); 
+    inputString = "";
+    stringComplete = false;
+  }
+}
 
-  int i = floor(raw / 50);
-  int value = (float(raw - (i * 50)) / 50.0) * 255.0;
-  
-//  Serial.println(raw);
-  Serial.print(i);
-  Serial.print(": ");
-  Serial.print(value);
-  Serial.println();
+void serialEvent() {
+  while (Serial.available()) {
+    char inChar = (char)Serial.read();
+    
+    if (inChar == ',') {
+      stringComplete = true;
+    } else {
+      inputString += inChar;
+    }
+  }
 }

@@ -1,64 +1,184 @@
-int in = 3;
-int pot = A1;
-int out = 0;
-boolean inConnected = false;
+#include "SoftwareSerial.h"
 
-int values[] = { 100, 0 };
-int idOut = 0;
-int connectionCounter = 0;
-int pulseTimeout = 256 * 60 * 2;
+#define rxPin 3
+#define txPin 4
+#define pot A1
+
+SoftwareSerial serial(rxPin, txPin);
+
+int tick = 0;
+int interval = 2000;
+
+char selfString[7] = {'0', ':', '1', '0', '2', '4', '\n'};
+boolean sendSelf = true;
+int selfIndex = 0;
+
+char input[200];
+int inputWriteIndex = 0;
+int inputReadIndex = 0;
+int inputSendIndex = 0;
+boolean inputReady = false;
+
 
 void setup() {
-  pinMode(in, INPUT);
-  pinMode(out, OUTPUT);
+  serial.begin(9600);
+  pinMode(pot, INPUT);
 }
 
 void loop() {
-  if(inConnected) {
-    connectionCounter = 0;
+  tick++;
+  
+  if(serial.available()) {
+    char in = (char) serial.read();
+    input[inputWriteIndex] = in;
+    inputWriteIndex++;
     
-    int raw = getPulseIn();
-    
-    if(raw == 0) {
-      inConnected = false;
-    } else {
-      values[1] = raw;
+    if(inputWriteIndex == 200) {
+      inputWriteIndex = 0;
     }
-  } else {
-    connectionCounter++;
     
-    if(connectionCounter == 100) {
-      connectionCounter = 0;
-      int check = pulseIn(in, HIGH, pulseTimeout);
-      if(check > 0)
-        inConnected = true;
+    if(in == '\n') {
+      inputReady = true;
     }
   }
   
-//  int compound = ;
-//  int idIn = floor(compound / 50);
-//  int value = (float(compound - (idIn * 50)) / 50.0) * 255.0;
-//  values[1] = getPulseIn();
+  if(tick >= interval) {
+    if(sendSelf) {
+      if(selfIndex == 0) {
+        char value[4];
+        itoa(analogRead(pot), value, 10);
+        selfString[2] = value[0];
+        selfString[3] = value[1];
+        selfString[4] = value[2];
+        selfString[5] = value[3];
+      }
+      
+      char currentChar = selfString[selfIndex];
+      
+      if(currentChar != '\0') {
+        serial.write(currentChar);
+      }
+      
+      selfIndex++;
+      
+      if(selfIndex == 7) {
+        selfIndex = 0;
+        sendSelf = false;
+      }
+    } else if(inputReady) {
+      char currentChar = input[inputReadIndex];
+      
+      if(inputSendIndex == 0) {
+        serial.write(currentChar + 1);
+      } else {
+        serial.write(currentChar);
+      }
+      
+      inputSendIndex++;
+      inputReadIndex++;
+      
+      if(currentChar == '\n') {
+        inputSendIndex = 0;
+        inputReady = false;
+        sendSelf = true;
+      }
+      
+      if(inputReadIndex == 200) {
+        inputReadIndex = 0;
+      }
+    } else {
+      sendSelf = true;
+    }
+    
+    tick = 0;
+  }
   
-  values[0] = (float(analogRead(pot)) / 1024.0) * 255.0;
+    
+//    serial.write();
+//    char in = (char) serial.read();
+//    
+//    if(in == '\n') {
+//    
+//    }
+//    serial.write('1');
+//    delay(10);
+//    serial.write(':');
+//    delay(10);
+//    serial.write('1');
+//    delay(10);
+//    serial.write('5');
+//    delay(10);
+//    serial.write('0');
+//    delay(10);
+//    serial.write('\n');
+//    delay(10);
+//  }
+    
+//    
+//    if(!startRead) {
+//      if(in == '\n') {
+//        startRead = true;
+//      }
+//    } else if(in == ':') {
+//      inputToggle = true;
+//    } else if(in == '\n') {
+//      inputToggle = false;
+//      
+//      serial.write(id+1);
+//      delay(10);
+//      serial.write(":");
+//      delay(10);
+//      for(int i = 0; i < sizeof(valueString); i++) {
+//        if(valueString[i] != '\0') {
+//          serial.write(valueString[i]);
+//          delay(10);
+//        }
+//      }
+//      serial.write("\n");
+//      delay(10);
+//      
+//      valueStringI = 0;
+//      valueString[0] = '\0';
+//      valueString[1] = '\0';
+//      valueString[2] = '\0';
+//      valueString[3] = '\0';
+//    } else if(inputToggle) {
+//      id = in - '0';
+//    } else {
+//      valueString[valueStringI] = in;
+//      valueStringI++;
+//    }
+//  }
   
-  // Out
-  idOut++;
-  if(idOut >= 2) idOut = 0;
+//  itoa(analogRead(pot), value, 10);
+//  
+//  serial.write('0');
+//  delay(10);
+//  serial.write(':');
+//  delay(10);
+//  for(int i = 0; i < sizeof(value); i++) {
+//    if(value[i] != '\0') {
+//      serial.write(value[i]);
+//      delay(10);
+//    }
+//  }
+//  serial.write('\n');
+//  delay(10);
   
-  int valueOut = (float(values[idOut]) / 255.0) * 50;
-  valueOut += (idOut) * 50;
   
-  analogWrite(out, valueOut);
-//  analogWrite(out, values[0]);
-
-  
-
-//  int valueOut = (float(getPulseIn()) / 255.0) * 50;
-//  valueOut += 0 * 50;
-//  analogWrite(out, valueOut);
-}
-
-int getPulseIn() {
-  return pulseIn(in, HIGH, pulseTimeout) / 1.05;
+//  delay(120);
+//  serial.write(analogRead(pot));
+//  delay(120);
+//  serial.write(",");
+//  delay(80);
+//  
+//  for(int i = 0; i < sizeof(values) / sizeof(int); i++) {
+//    if(values[i] > -1) {
+//      serial.write(i+1);
+//      serial.write(":");
+//      serial.write(values[i]);
+//      serial.write(","); 
+//      delay(10);
+//    }
+//  }
 }
