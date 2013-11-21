@@ -3,10 +3,12 @@
     <title>Pot Modules</title>
 </head>
 <body>
+    <input type="range" id="slider-1" min="0" max="255" step="5" />
+    <input type="range" id="slider-2" min="0" max="255" step="5" />
     <div id="value-1"></div>
     <div id="value-2"></div>
 
-    <canvas id="canvas"></canvas>
+    <canvas width="500" height="500" id="canvas"></canvas>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -19,8 +21,17 @@
             document.getElementById('value-2')
         ];
 
+        var sliders = [
+            document.getElementById('slider-1'),
+            document.getElementById('slider-2')
+        ];
+
         var targetValues = [0, 0];
         var values = [0, 0];
+
+        socket.on('open', function(data) {
+            console.log('Socket open');
+        });
 
         socket.on('update', function(data) {
             targetValues[data.id] = data.value;
@@ -35,17 +46,25 @@
                 values[i] += (targetValues[i] - values[i]) * 0.2;
                 divs[i].innerHTML = parseInt(values[i], 10);
 
-                var angle = values[i] * 0.0174532925;
-                var x = canvas.width / 2;
-                var y = canvas.height / 2;
+                var angle = (values[i] * 0.0174532925) + offset.angle;
+                var x = (canvas.width / 2) + offset.x;
+                var y = (canvas.height / 2) + offset.y;
                 context.moveTo(x, y);
-                context.lineTo(x + Math.cos(angle) * 50, y+  Math.sin(angle) * 50);
+                context.lineTo(x + Math.cos(angle) * 50, y + Math.sin(angle) * 50 );
                 context.stroke();
                 context.restore();
+
+                offset = { x: Math.cos(angle) * 50, y: Math.sin(angle) * 50, angle: angle }
             }
 
             window.requestAnimationFrame(loop);
         }
+
+        sliders.forEach(function(slider, i) {
+            slider.addEventListener('change', function() {
+                targetValues[i] = this.value;
+            });
+        })
 
         loop();
     </script>

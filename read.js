@@ -26,7 +26,6 @@ function openSerial(comName) {
     serial.open(function () {
         console.log('Serial opened, streaming data...');
         serial.on('data', function(data) {
-            console.log(data);
             if(socket) {
                 var split = data.replace(/\s/g, '').split(':');
                 socket.emit('update', {
