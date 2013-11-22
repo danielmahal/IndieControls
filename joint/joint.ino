@@ -6,19 +6,20 @@
 
 SoftwareSerial serial(rxPin, txPin);
 
+int prevPot = 0;
+
 int tick = 0;
-int interval = 2000;
+int interval = 100;
 
 char selfString[7] = {'0', ':', '1', '0', '2', '4', '\n'};
 boolean sendSelf = true;
 int selfIndex = 0;
 
-char input[200];
-int inputWriteIndex = 0;
-int inputReadIndex = 0;
-int inputSendIndex = 0;
-boolean inputReady = false;
-
+char inputTemp[7];
+char inputTempIndex = 0;
+char input[7];
+char inputIndex = 0;
+char inputReady = false;
 
 void setup() {
   serial.begin(9600);
@@ -28,25 +29,44 @@ void setup() {
 void loop() {
   tick++;
   
-  if(serial.available()) {
+  if(serial.available() && !inputReady) {
     char in = (char) serial.read();
-    input[inputWriteIndex] = in;
-    inputWriteIndex++;
     
-    if(inputWriteIndex == 200) {
-      inputWriteIndex = 0;
-    }
-    
-    if(in == '\n') {
-      inputReady = true;
+    if(inputTempIndex == -1) {
+      if(in == '\n') {
+        inputTempIndex = 0;
+      }
+    } else {
+      if(inputTempIndex < 7) {
+        inputTemp[inputTempIndex] = in;
+        inputTempIndex++;
+      }
+      
+      if(in == '\n') {
+        for(int i = 0; i < 7; i++) {
+          input[i] = inputTemp[i];
+          inputTemp[i] = '\0';
+        }
+        
+        inputReady = true;
+        inputTempIndex = 0;
+      }
     }
   }
   
   if(tick >= interval) {
-    if(sendSelf) {
+    int potValue = analogRead(pot);
+    boolean change = false;
+    
+    if(abs(potValue - prevPot) > 2) {
+      prevPot = potValue;
+      change = true;
+    }
+    
+    if(sendSelf && change) {
       if(selfIndex == 0) {
         char value[4];
-        itoa(analogRead(pot), value, 10);
+        itoa(potValue, value, 10);
         selfString[2] = value[0];
         selfString[3] = value[1];
         selfString[4] = value[2];
@@ -66,26 +86,47 @@ void loop() {
         sendSelf = false;
       }
     } else if(inputReady) {
-      char currentChar = input[inputReadIndex];
+      char currentChar = input[inputIndex];
       
-      if(inputSendIndex == 0) {
-        serial.write(currentChar + 1);
+      if(inputIndex < 7) {
+//        if(inputIndex == 0) {
+//          serial.write(currentChar + 1);
+//        } else if(currentChar != '\0') {
+//          serial.write(currentChar);
+//        }
+
+        if(inputIndex == 0) {
+          serial.write(currentChar + 1);
+        } else if(currentChar != '\0') {
+          serial.write(currentChar);
+        }
+        
+        inputIndex++;
       } else {
-        serial.write(currentChar);
-      }
-      
-      inputSendIndex++;
-      inputReadIndex++;
-      
-      if(currentChar == '\n') {
-        inputSendIndex = 0;
-        inputReady = false;
+        for(int i = 0; i < 7; i++) {
+          input[i] = '\0';
+        }
+        
+        inputIndex = 0;
         sendSelf = true;
+        inputReady = false;
+        inputTempIndex = -1;
       }
       
-      if(inputReadIndex == 200) {
-        inputReadIndex = 0;
-      }
+//      if(inputIndex == 0) {
+//        serial.write(currentChar + 1);
+//      } else {
+//        serial.write(currentChar);
+//      }
+//      
+//      inputIndex++;
+//      
+//      if(inputIndex == 7) {
+//        inputIndex = 0;
+//        inputReady = false;
+//        sendSelf = true;
+//      }
+//      sendSelf = true;
     } else {
       sendSelf = true;
     }
