@@ -45,6 +45,8 @@ var io = socketio.listen(server, {
 
 server.listen(8000);
 
+app.use('/vendor', express.static(__dirname + '/vendor'));
+
 app.get('/', function (req, res) {
     res.sendfile(__dirname + '/index.html');
 });
