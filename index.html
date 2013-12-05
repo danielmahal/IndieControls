@@ -44,7 +44,7 @@
         socket.on('update', function(data) {
             if(data.id > joints.length) return;
 
-            var angle = (-data.value / 1024 * (Math.PI * 2) + Math.PI) * 0.5;
+            var angle = (-data.value / 1024 * (Math.PI * 2) + Math.PI) * 0.55;
 
             if(!joints[data.id]) {
                 joints[data.id] =  { angle: angle, targetAngle: angle };
@@ -60,7 +60,7 @@
             var y = canvas.height / 2;
 
             context.fillStyle = '#333';
-            context.strokeStyle = 'aquamarine';
+            context.strokeStyle = '#6bffb1';
             context.fillRect(0, 0, canvas.width, canvas.height);
 
             joints.forEach(function(joint, i) {
@@ -98,7 +98,7 @@
             window.requestAnimationFrame(loop);
 
             joints.forEach(function(joint) {
-                joint.angle += (joint.targetAngle - joint.angle) * 0.4;
+                joint.angle += (joint.targetAngle - joint.angle) * 0.5;
             });
 
             draw();
