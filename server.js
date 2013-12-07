@@ -1,39 +1,69 @@
 var express = require('express'),
     http = require('http'),
     socketio = require('socket.io'),
-    SerialPort = require('serialport');
-
-console.log('Trying to open serial...');
+    SerialPort = require('serialport'),
+    Parser = require('./serialparser');
 
 var serial, socket;
 
-SerialPort.list(function (err, ports) {
-    if(err) console.error(err);
+var usbConnected = false;
 
-    ports.forEach(function(port) {
-        console.log(port.comName);
-        if(/usb/.test(port.comName))
-            openSerial(port.comName);
+var connectUsb = function() {
+    console.log('Trying to open serial...');
+
+    SerialPort.list(function (err, ports) {
+        if(err) console.error(err);
+
+        ports.forEach(function(port) {
+            console.log(port.comName);
+            if(/usb/.test(port.comName)) {
+                usbConnected = true;
+                openSerial(port.comName);
+                clearInterval(usbInterval);
+
+                if(socket)
+                    socket.emit('usb_connect');
+            }
+        });
     });
-});
+}
+
+var usbInterval = setInterval(connectUsb, 1000);
+connectUsb();
 
 function openSerial(comName) {
     serial = new SerialPort.SerialPort(comName, {
-        baudrate: 9600,
-        parser: SerialPort.parsers.readline("\n")
+        baudrate: 9600
     }, false);
 
     serial.open(function () {
-        console.log('Serial opened, streaming data...');
-        serial.on('data', function(data) {
-            if(socket) {
-                var split = data.split(':');
-                socket.emit('update', {
-                    id: parseInt(split[0], 10),
-                    value: parseInt(split[1], 10)
-                });
-            }
+        var parser = new Parser(serial);
+
+        serial.on('data', parser.parse.bind(parser));
+
+        parser.on('connect', function(i, module) {
+            console.log('Connected', i, module);
+            if(socket)
+                socket.emit('module_connect', i, module);
         });
+
+        parser.on('disconnect', function(i, module) {
+            console.log('Disconnected', i, module);
+            if(socket)
+                socket.emit('module_disconnect', i, module);
+        });
+
+        parser.on('value', function(i, module) {
+            console.log('Value', i, module);
+            if(socket)
+                socket.emit('module_value', i, module);
+        });
+
+        parser.on('ping', function(i, module) {
+            console.log('Ping', i, module);
+        });
+
+        console.log('Serial opened, streaming data...');
     });
 }
 
@@ -51,6 +81,12 @@ app.get('/', function (req, res) {
     res.sendfile(__dirname + '/index.html');
 });
 
+app.get('/connect', function (req, res) {
+    res.sendfile(__dirname + '/connect.html');
+});
+
 io.sockets.on('connection', function (s) {
     socket = s;
+    if(usbConnected)
+        socket.emit('usb_connect');
 });
