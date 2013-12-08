@@ -1,5 +1,6 @@
 var ThrustNoise = require('./audio/ThrustNoise');
     BackgroundSound = require('./audio/Background'),
+    ChainSound = require('./audio/Chain'),
     Particle = require('./Particle');
 
 var audioContext = new webkitAudioContext();
@@ -8,14 +9,15 @@ var canvas = document.getElementById('canvas');
 var context = canvas.getContext('2d');
 var socket = io.connect('http://localhost');
 
-var thrustNoise = new ThrustNoise(audioContext, 0.3);
+var thrustNoise = new ThrustNoise(audioContext, 0.1);
 var backgroundSound = new BackgroundSound(audioContext, 'assets/sounds/bg_loop.wav', 1);
+var chainSound = new ChainSound(audioContext, 0.3);
 
 var player;
 var buttonDown = false;
 var targetAngle = 0;
 
-var particles = [];
+var thrustParticles = [];
 
 socket.on('open', function(data) {
     // console.log('Socket open');
@@ -46,6 +48,12 @@ Physics({
         height: 300,
         meta: false,
         styles: {
+            'circle' : {
+                strokeStyle: null,
+                lineWidth: 0,
+                fillStyle: 'aquamarine',
+                angleIndicator: '#333'
+            },
             'convex-polygon' : {
                 strokeStyle: null,
                 lineWidth: 0,
@@ -55,7 +63,6 @@ Physics({
         }
     });
 
-    world.add(rigidConstraints);
     world.add(renderer);
     world.add(Physics.behavior('body-collision-detection'));
     world.add(Physics.behavior('body-impulse-response'));
@@ -63,6 +70,12 @@ Physics({
     world.add(Physics.behavior('constant-acceleration'), {
         acc: { x : 0, y: 0.005 }
     });
+
+    var rigidConstraints = Physics.behavior('rigid-constraint-manager', {
+        targetLength: 100
+    });
+
+    world.add(rigidConstraints);
 
     player = Physics.body('convex-polygon', {
         x: 0,
@@ -80,15 +93,11 @@ Physics({
 
     world.add(player);
 
-    var rigidConstraints = Physics.behavior('rigid-constraint-manager', {
-        targetLength: 100
-    });
-
     for(var i = 0; i < 5; i++) {
         var ball = Physics.body('circle', {
             x: Math.random() * window.innerWidth,
             y: Math.random() * window.innerHeight,
-            mass: 0.5,
+            mass: 0.2,
             cof: 0.8,
             radius: 10,
             fixed: true,
@@ -114,36 +123,45 @@ Physics({
         player.state.angular.vel += (targetAngle - player.state.angular.pos) * 0.01;
 
         if(buttonDown) {
+            var x = player.state.pos.get(0);
+            var y = player.state.pos.get(1);
             var angle = player.state.angular.pos;
             player.accelerate(Physics.vector(Math.cos(angle) * 0.004, Math.sin(angle) * 0.002));
-            particles.push(new Particle(player.state.pos.get(0), player.state.pos.get(1), player.state.angular.pos + Math.PI));
+            thrustParticles.push(new Particle(x, y, angle + Math.PI));
         }
 
-        for(var i in particles) {
-            particles[i].life -= Math.random() * 0.05 + 0.05;
-            if(particles[i].life <= 0)
-                delete particles[i];
+        for(var i in thrustParticles) {
+            thrustParticles[i].life -= Math.random() * 0.05 + 0.05;
+            var particle = thrustParticles[i];
 
-            if(particles[i]) {
-                particles[i].size = Math.sin(particles[i].life * Math.PI) * 5;
-                particles[i].x += Math.cos(particles[i].angle);
-                particles[i].y += Math.sin(particles[i].angle);
+            if(particle.life <= 0)
+                delete thrustParticles[i];
+
+            if(particle) {
+                particle.size = Math.sin(particle.life * Math.PI) * 5;
+                particle.x += Math.cos(particle.angle);
+                particle.y += Math.sin(particle.angle);
             }
         }
 
         world.render();
     });
 
-    world.subscribe('render', function() {
-        for(var i in particles) {
-            if(particles[i]) {
+    world.subscribe('beforeRender', function() {
+        for(var i in thrustParticles) {
+            var particle = thrustParticles[i];
+            if(particle) {
                 context.fillStyle = 'white';
                 context.beginPath();
-                context.arc(particles[i].x, particles[i].y, particles[i].size, 0, Math.PI * 2);
+                context.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
                 context.closePath();
                 context.fill();
             }
         }
+    });
+
+    world.subscribe('afterrender', function() {
+        if(collided) debugger;
     });
 
     world.subscribe('collisions:detected', function( data ){
@@ -162,10 +180,50 @@ Physics({
         if(data.bodyA != player && data.bodyB != player) return;
         var other = data.bodyA == player ? data.bodyB : data.bodyA;
 
-        if(other.name != 'ball') return;
+        if(other.name != 'ball' || other.fixed === false) return;
 
+        var x = player.state.pos.get(0);
+        var y = player.state.pos.get(1);
+        var angle = player.state.angular.pos + Math.PI;
+        var distance;
+
+        var chain = [];
+        for(var i = 0; i < Math.round(Math.random() * 10 + 4); i++) {
+            distance = i === 0 ? 20 : 5;
+
+            x += Math.cos(angle) * distance;
+            y += Math.sin(angle) * distance;
+
+            chain.push(new Physics.body('circle', {
+                x: x,
+                y: y,
+                radius: 1,
+                restitution: 0,
+                cof: 0,
+                mass: 0.01
+            }));
+
+            rigidConstraints.constrain(chain[i - 1] || player, chain[i], distance);
+        }
+
+        distance = 20;
+
+        x += Math.cos(angle) * distance;
+        y += Math.sin(angle) * distance;
+
+        world.add(chain);
+
+        // other.state.pos = Physics.vector({ x: x, y: y });
+        // other.state.old.pos = Physics.vector({ x: x, y: y });
+
+        rigidConstraints.constrain(chain[chain.length - 1], other, distance);
         other.fixed = false;
-        rigidConstraints.constrain(player, other);
+
+        chainSound.attach();
+
+        collided = true;
+
+        // rigidConstraints.constrain(player, other);
     });
 
     Physics.util.ticker.subscribe(function(time, dt){
