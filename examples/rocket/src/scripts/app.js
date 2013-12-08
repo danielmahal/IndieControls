@@ -51,13 +51,13 @@ Physics({
             'circle' : {
                 strokeStyle: null,
                 lineWidth: 0,
-                fillStyle: 'aquamarine',
-                angleIndicator: '#333'
+                fillStyle: 'white',
+                angleIndicator: null
             },
             'convex-polygon' : {
-                strokeStyle: null,
+                strokeStyle: 'transparent',
                 lineWidth: 0,
-                fillStyle: 'white',
+                fillStyle: 'aquamarine',
                 angleIndicator: '#333'
             }
         }
@@ -151,17 +151,13 @@ Physics({
         for(var i in thrustParticles) {
             var particle = thrustParticles[i];
             if(particle) {
-                context.fillStyle = 'white';
+                context.fillStyle = 'salmon';
                 context.beginPath();
                 context.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
                 context.closePath();
                 context.fill();
             }
         }
-    });
-
-    world.subscribe('afterrender', function() {
-        if(collided) debugger;
     });
 
     world.subscribe('collisions:detected', function( data ){
@@ -213,17 +209,10 @@ Physics({
 
         world.add(chain);
 
-        // other.state.pos = Physics.vector({ x: x, y: y });
-        // other.state.old.pos = Physics.vector({ x: x, y: y });
-
         rigidConstraints.constrain(chain[chain.length - 1], other, distance);
         other.fixed = false;
 
         chainSound.attach();
-
-        collided = true;
-
-        // rigidConstraints.constrain(player, other);
     });
 
     Physics.util.ticker.subscribe(function(time, dt){
