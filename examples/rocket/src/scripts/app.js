@@ -9,7 +9,7 @@ var context = canvas.getContext('2d');
 var socket = io.connect('http://localhost');
 
 var thrustNoise = new ThrustNoise(audioContext, 0.3);
-var backgroundSound = new BackgroundSound(audioContext, 'assets/sounds/bg_loop.wav', 0.2);
+var backgroundSound = new BackgroundSound(audioContext, 'assets/sounds/bg_loop.wav', 1);
 
 var player;
 var buttonDown = false;

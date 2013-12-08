@@ -1,7 +1,8 @@
 var ThrustNoise = function(context, gainValue) {
     this.gainValue = gainValue;
     this.context = context;
-    this.interval;
+    this.filterInterval;
+    this.disconnectTimeout;
     this.timer = 0;
 
     this.filter = context.createBiquadFilter();
@@ -32,19 +33,28 @@ var ThrustNoise = function(context, gainValue) {
 }
 
 ThrustNoise.prototype.start = function() {
+    clearTimeout(this.disconnectTimeout);
+
     this.filter.connect(this.context.destination);
 
-    this.interval = setInterval(function() {
-        this.timer++;
+    this.gain.gain.linearRampToValueAtTime(0, this.context.currentTime);
+    this.gain.gain.linearRampToValueAtTime(this.gainValue, this.context.currentTime + 0.2);
 
-        this.filter.frequency.value = Math.random() * 900 + 800;
-        this.gain.gain.value = (Math.random() * 0.3 + 0.2) * this.gainValue;
+    this.filterInterval = setInterval(function() {
+        this.timer++;
+        this.filter.frequency.value = Math.random() * 1600 + 800;
     }.bind(this), 30);
 }
 
 ThrustNoise.prototype.stop = function() {
-    this.filter.disconnect(this.context.destination);
-    clearInterval(this.interval);
+    this.gain.gain.linearRampToValueAtTime(this.gainValue, this.context.currentTime);
+    this.gain.gain.linearRampToValueAtTime(0, this.context.currentTime + 0.2);
+
+    this.disconnectTimeout = setTimeout(function() {
+        this.filter.disconnect(this.context.destination);
+    }.bind(this), 200);
+
+    clearInterval(this.filterInterval);
 }
 
 module.exports = ThrustNoise;
