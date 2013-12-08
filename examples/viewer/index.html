@@ -1,0 +1,118 @@
+<html>
+<head>
+    <title>Indie controls</title>
+    <style>
+        body {
+            margin: 0;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <script src="vendor/dat.gui.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        var options = {
+            joint: {
+                size: 20,
+                length: 120,
+                baseAngle: Math.PI
+            }
+        };
+
+        var socket = io.connect('http://localhost');
+        var canvas = document.getElementById('canvas');
+        var context = canvas.getContext('2d');
+        var gui = new dat.GUI();
+        var joints = [];
+
+        gui.add(options.joint, 'length', 10, 300);
+        gui.add(options.joint, 'size', 2, 50);
+        gui.add(options.joint, 'baseAngle', 0, Math.PI * 2);
+
+        socket.on('open', function(data) {
+            console.log('Socket open');
+        });
+
+        socket.on('update', function(data) {
+            if(data.id > joints.length) return;
+
+            var angle = (-data.value / 1024 * (Math.PI * 2) + Math.PI) * 0.55;
+
+            if(!joints[data.id]) {
+                joints[data.id] =  { angle: angle, targetAngle: angle };
+                return;
+            }
+
+            joints[data.id].targetAngle = angle;
+        });
+
+        var draw = function() {
+            var angle = options.joint.baseAngle;
+            var x = canvas.width / 2;
+            var y = canvas.height / 2;
+
+            context.fillStyle = '#333';
+            context.strokeStyle = '#6bffb1';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            joints.forEach(function(joint, i) {
+                angle += joint.angle;
+
+                context.beginPath();
+                context.arc(x, y, options.joint.size, 0, Math.PI * 2);
+                context.stroke();
+                context.closePath();
+
+                var to = {
+                    x: x + Math.cos(angle) * options.joint.length,
+                    y: y + Math.sin(angle) * options.joint.length
+                };
+
+                context.beginPath();
+                context.moveTo(x, y);
+                context.lineTo(to.x, to.y);
+                context.stroke();
+                context.closePath();
+
+                if(i == joints.length - 1) {
+                    context.beginPath();
+                    context.arc(to.x, to.y, options.joint.size, 0, Math.PI * 2);
+                    context.stroke();
+                    context.closePath();
+                }
+
+                x = to.x;
+                y = to.y;
+            });
+        }
+
+        var loop = function() {
+            window.requestAnimationFrame(loop);
+
+            joints.forEach(function(joint) {
+                joint.angle += (joint.targetAngle - joint.angle) * 0.5;
+            });
+
+            draw();
+        }
+
+        var resize = function() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resize);
+
+        resize();
+        loop();
+    </script>
+</body>
+</html>

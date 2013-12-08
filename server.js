@@ -75,18 +75,28 @@ var io = socketio.listen(server, {
 
 server.listen(8000);
 
-app.use('/vendor', express.static(__dirname + '/vendor'));
+io.sockets.on('connection', function (s) {
+    socket = s;
+    if(usbConnected)
+        socket.emit('usb_connect');
+});
+
+app.use('/rocket', express.static(__dirname + '/examples/rocket'));
+app.use('/connect', express.static(__dirname + '/examples/connect'));
+app.use('/viewer', express.static(__dirname + '/examples/viewer'));
 
 app.get('/', function (req, res) {
     res.sendfile(__dirname + '/index.html');
 });
 
-app.get('/connect', function (req, res) {
-    res.sendfile(__dirname + '/connect.html');
+app.get('/rocket', function (req, res) {
+    res.sendfile(__dirname + '/examples/rocket/index.html');
 });
 
-io.sockets.on('connection', function (s) {
-    socket = s;
-    if(usbConnected)
-        socket.emit('usb_connect');
+app.get('/connect', function (req, res) {
+    res.sendfile(__dirname + '/examples/connect/index.html');
+});
+
+app.get('/viewer', function (req, res) {
+    res.sendfile(__dirname + '/examples/viewer/index.html');
 });

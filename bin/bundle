@@ -1,0 +1,33 @@
+#!/usr/bin/env node
+
+var through = require('through');
+var browserify = require('browserify');
+
+var bundle = browserify({
+    debug: true
+});
+
+bundle.transform(function(file) {
+    if(/\.json/.test(file)) {
+        var buffer = '';
+
+        function write (buf) {
+            buffer += buf;
+        }
+
+        function end () {
+            this.queue('module.exports = ' + buffer + ';');
+            this.queue(null);
+        }
+
+        return through(write, end);
+    }
+
+    return through();
+});
+
+bundle.add(process.argv[2]);
+
+bundle.bundle(null, function(err, src) {
+    process.stdout.write(src);
+});
