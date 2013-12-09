@@ -41,9 +41,8 @@ var Chain = function(context, gainValue) {
 }
 
 Chain.prototype.attach = function() {
-    this.looping = true;
-
     if(!this.looping) this.loop();
+    this.looping = true;
 
     var source = this.context.createBufferSource();
     source.buffer = this.attachBuffer;
@@ -63,7 +62,10 @@ Chain.prototype.attach = function() {
 }
 
 Chain.prototype.loop = function() {
-
+    console.log('loop');
+    this.loopSound.gain.value = 0.05;
+    this.loopSound.start(0);
+    this.loopSound.connect(this.context.destination);
 }
 
 

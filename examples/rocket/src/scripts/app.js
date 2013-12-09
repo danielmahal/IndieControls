@@ -1,7 +1,8 @@
 var ThrustNoise = require('./audio/ThrustNoise');
     BackgroundSound = require('./audio/Background'),
     ChainSound = require('./audio/Chain'),
-    Particle = require('./Particle');
+    Particle = require('./Particle'),
+    DangerSound = require('./audio/Danger');
 
 var audioContext = new webkitAudioContext();
 
@@ -15,7 +16,7 @@ var chainSound = new ChainSound(audioContext, 0.3);
 
 var player;
 var buttonDown = false;
-var targetAngle = 0;
+var targetAngle = -Math.PI / 2;
 
 var thrustParticles = [];
 
@@ -68,7 +69,7 @@ Physics({
     world.add(Physics.behavior('body-impulse-response'));
     world.add(Physics.behavior('sweep-prune'));
     world.add(Physics.behavior('constant-acceleration'), {
-        acc: { x : 0, y: 0.005 }
+        acc: { x : 0, y: 0.004 }
     });
 
     var rigidConstraints = Physics.behavior('rigid-constraint-manager', {
@@ -78,10 +79,11 @@ Physics({
     world.add(rigidConstraints);
 
     player = Physics.body('convex-polygon', {
-        x: 0,
-        y: 0,
+        x: window.innerWidth / 2,
+        y: window.innerHeight - 10,
         restitution: 0.5,
-        mass: 5,
+        angle: targetAngle,
+        mass: 10,
         cof: 0.1,
         vertices: [
             { x: 0, y: 0 },
@@ -99,7 +101,7 @@ Physics({
             y: Math.random() * window.innerHeight,
             mass: 0.2,
             cof: 0.8,
-            radius: 10,
+            radius: Math.random() * 10 + 8,
             fixed: true,
             restitution: 0.5
         });
@@ -126,7 +128,7 @@ Physics({
             var x = player.state.pos.get(0);
             var y = player.state.pos.get(1);
             var angle = player.state.angular.pos;
-            player.accelerate(Physics.vector(Math.cos(angle) * 0.004, Math.sin(angle) * 0.002));
+            player.accelerate(Physics.vector(Math.cos(angle) * 0.004, Math.sin(angle) * 0.003));
             thrustParticles.push(new Particle(x, y, angle + Math.PI));
         }
 
@@ -164,6 +166,14 @@ Physics({
         var c;
         for (var i = 0, l = data.collisions.length; i < l; i++){
             c = data.collisions[ i ];
+
+            var isPlayer = c.bodyA === player || c.bodyB === player;
+            var isBall = c.bodyA.name === 'ball' && c.bodyB.name === 'ball';
+            var isChain = c.bodyA.name === 'chain' && c.bodyB.name === 'chain';
+
+            // if(isPlayer && !isBall && !isChain && Math.abs(c.mtv.x + c.mtv.y) > 5)
+            //     rigidConstraints.drop();
+
             world.publish({
                 topic: 'collision-pair',
                 bodyA: c.bodyA,
@@ -190,14 +200,18 @@ Physics({
             x += Math.cos(angle) * distance;
             y += Math.sin(angle) * distance;
 
-            chain.push(new Physics.body('circle', {
+            var joint = new Physics.body('circle', {
                 x: x,
                 y: y,
                 radius: 1,
                 restitution: 0,
                 cof: 0,
                 mass: 0.01
-            }));
+            });
+
+            chain.push(joint);
+
+            joint.name = 'chain';
 
             rigidConstraints.constrain(chain[i - 1] || player, chain[i], distance);
         }
@@ -212,7 +226,19 @@ Physics({
         rigidConstraints.constrain(chain[chain.length - 1], other, distance);
         other.fixed = false;
 
+        if(!player.attached) {
+            player.attached = [];
+            player.chains = [];
+        }
+
+        player.attached.push(ball);
+        player.chains.push(chain);
+
         chainSound.attach();
+    });
+
+    socket.on('module_disconnect', function(i, data) {
+        rigidConstraints.drop();
     });
 
     Physics.util.ticker.subscribe(function(time, dt){
