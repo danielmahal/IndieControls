@@ -23,15 +23,15 @@ socket.on('open', function(data) {
     // console.log('Socket open');
 });
 
-socket.on('module_connect', function(player, i, data) {});
+socket.on('module_connect', function(playerIndex, i, data) {});
 
-socket.on('module_disconnect', function(player, i, data) {});
+socket.on('module_disconnect', function(playerIndex, i, data) {});
 
-socket.on('module_value', function(player, i, data) {
+socket.on('module_value', function(playerIndex, i, data) {
     if(data.type == 'button') {
-        players[player].buttonDown = data.value;
-
-        // thrustNoise[buttonDown ? 'start' : 'stop']();
+        var player = players[playerIndex];
+        player.buttonDown = data.value;
+        player.thrustNoise[data.value ? 'start' : 'stop']();
     }
 
     if(data.type == 'pot')
@@ -98,6 +98,7 @@ Physics({
         player.name = 'player';
         player.thrustParticles = [];
         player.buttonDown = false;
+        player.thrustNoise = new ThrustNoise(audioContext, 0.1);
 
         world.add(player);
         players.push(player);
