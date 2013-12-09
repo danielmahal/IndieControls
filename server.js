@@ -4,9 +4,10 @@ var express = require('express'),
     SerialPort = require('serialport'),
     Parser = require('./serialparser');
 
-var serial, socket;
+var socket;
 
-var usbConnected = false;
+var comsConnected = [];
+var serials = [];
 
 var connectUsb = function() {
     console.log('Trying to open serial...');
@@ -15,14 +16,19 @@ var connectUsb = function() {
         if(err) console.error(err);
 
         ports.forEach(function(port) {
-            console.log(port.comName);
-            if(/usb/.test(port.comName)) {
-                usbConnected = true;
-                openSerial(port.comName);
-                clearInterval(usbInterval);
+            if(/usb/.test(port.comName) && comsConnected.indexOf(port.comName) === -1) {
+                var index = comsConnected.length
+                openSerial(port.comName, index);
+                comsConnected.push(port.comName);
 
-                if(socket)
-                    socket.emit('usb_connect');
+                // Stop retrying connecting if there are two connected
+                if(comsConnected.length == 2) {
+                    clearInterval(usbInterval);
+                }
+
+                if(socket) {
+                    socket.emit('usb_connect', index);
+                }
             }
         });
     });
@@ -31,36 +37,38 @@ var connectUsb = function() {
 var usbInterval = setInterval(connectUsb, 1000);
 connectUsb();
 
-function openSerial(comName) {
-    serial = new SerialPort.SerialPort(comName, {
+function openSerial(comName, comIndex) {
+    console.log('Found serial', comName, 'at index', comIndex);
+
+    serials[comIndex] = new SerialPort.SerialPort(comName, {
         baudrate: 9600
     }, false);
 
-    serial.open(function () {
-        var parser = new Parser(serial);
+    serials[comIndex].open(function () {
+        var parser = new Parser(serials[comIndex]);
 
-        serial.on('data', parser.parse.bind(parser));
+        serials[comIndex].on('data', parser.parse.bind(parser));
 
         parser.on('connect', function(i, module) {
-            console.log('Connected', i, module);
+            console.log('Connected', comIndex, i, module);
             if(socket)
-                socket.emit('module_connect', i, module);
+                socket.emit('module_connect', comIndex, i, module);
         });
 
         parser.on('disconnect', function(i, module) {
-            console.log('Disconnected', i, module);
+            console.log('Disconnected', comIndex, i, module);
             if(socket)
-                socket.emit('module_disconnect', i, module);
+                socket.emit('module_disconnect', comIndex, i, module);
         });
 
         parser.on('value', function(i, module) {
-            console.log('Value', i, module);
+            console.log('Value', comIndex, i, module);
             if(socket)
-                socket.emit('module_value', i, module);
+                socket.emit('module_value', comIndex, i, module);
         });
 
         parser.on('ping', function(i, module) {
-            console.log('Ping', i, module);
+            console.log('Ping', comIndex, i, module);
         });
 
         console.log('Serial opened, streaming data...');
@@ -77,8 +85,11 @@ server.listen(8000);
 
 io.sockets.on('connection', function (s) {
     socket = s;
-    if(usbConnected)
-        socket.emit('usb_connect');
+
+    serials.forEach(function(serial, i) {
+        socket.emit('usb_connect', i);
+    });
+
 });
 
 app.use('/rocket', express.static(__dirname + '/examples/rocket'));

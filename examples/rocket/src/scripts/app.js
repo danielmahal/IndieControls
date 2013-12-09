@@ -14,8 +14,7 @@ var thrustNoise = new ThrustNoise(audioContext, 0.1);
 var backgroundSound = new BackgroundSound(audioContext, 'assets/sounds/bg_loop.wav', 1);
 var chainSound = new ChainSound(audioContext, 0.3);
 
-var player;
-var buttonDown = false;
+var players = [];
 var targetAngle = -Math.PI / 2;
 
 var thrustParticles = [];
@@ -24,14 +23,15 @@ socket.on('open', function(data) {
     // console.log('Socket open');
 });
 
-socket.on('module_connect', function(i, data) {});
+socket.on('module_connect', function(player, i, data) {});
 
-socket.on('module_disconnect', function(i, data) {});
+socket.on('module_disconnect', function(player, i, data) {});
 
-socket.on('module_value', function(i, data) {
+socket.on('module_value', function(player, i, data) {
     if(data.type == 'button') {
-        buttonDown = data.value;
-        thrustNoise[buttonDown ? 'start' : 'stop']();
+        players[player].buttonDown = data.value;
+
+        // thrustNoise[buttonDown ? 'start' : 'stop']();
     }
 
     if(data.type == 'pot')
@@ -78,22 +78,30 @@ Physics({
 
     world.add(rigidConstraints);
 
-    player = Physics.body('convex-polygon', {
-        x: window.innerWidth / 2,
-        y: window.innerHeight - 10,
-        restitution: 0.5,
-        angle: targetAngle,
-        mass: 10,
-        cof: 0.1,
-        vertices: [
-            { x: 0, y: 0 },
-            { x: 0, y: 20 },
-            { x: 20, y: 20 },
-            { x: 20, y: 0 }
-        ]
-    });
+    socket.on('usb_connect', function(i) {
+        var player = Physics.body('convex-polygon', {
+            x: window.innerWidth * Math.random(),
+            y: window.innerHeight - 10,
+            restitution: 0.5,
+            angle: targetAngle,
+            mass: 10,
+            cof: 0.1,
+            vertices: [
+                { x: 0, y: 0 },
+                { x: 0, y: 20 },
+                { x: 20, y: 20 },
+                { x: 20, y: 0 }
+            ]
+        });
 
-    world.add(player);
+        player.index = i;
+        player.name = 'player';
+        player.thrustParticles = [];
+        player.buttonDown = false;
+
+        world.add(player);
+        players.push(player);
+    });
 
     for(var i = 0; i < 5; i++) {
         var ball = Physics.body('circle', {
@@ -121,45 +129,47 @@ Physics({
     world.add(edge);
 
     world.subscribe('step', function() {
-        player.state.angular.vel *= 0.85;
-        player.state.angular.vel += (targetAngle - player.state.angular.pos) * 0.01;
+        players.forEach(function(player, i) {
+            player.state.angular.vel *= 0.85;
+            player.state.angular.vel += (targetAngle - player.state.angular.pos) * 0.01;
 
-        if(buttonDown) {
-            var x = player.state.pos.get(0);
-            var y = player.state.pos.get(1);
-            var angle = player.state.angular.pos;
-            player.accelerate(Physics.vector(Math.cos(angle) * 0.004, Math.sin(angle) * 0.003));
-            thrustParticles.push(new Particle(x, y, angle + Math.PI));
-        }
-
-        for(var i in thrustParticles) {
-            thrustParticles[i].life -= Math.random() * 0.05 + 0.05;
-            var particle = thrustParticles[i];
-
-            if(particle.life <= 0)
-                delete thrustParticles[i];
-
-            if(particle) {
-                particle.size = Math.sin(particle.life * Math.PI) * 5;
-                particle.x += Math.cos(particle.angle);
-                particle.y += Math.sin(particle.angle);
+            if(player.buttonDown) {
+                var x = player.state.pos.get(0);
+                var y = player.state.pos.get(1);
+                var angle = player.state.angular.pos;
+                player.accelerate(Physics.vector(Math.cos(angle) * 0.004, Math.sin(angle) * 0.003));
+                player.thrustParticles.push(new Particle(x, y, angle + Math.PI));
             }
-        }
+
+            player.thrustParticles.forEach(function(particle, i) {
+                particle.life -= Math.random() * 0.05 + 0.05;
+
+                if(particle.life <= 0)
+                    delete player.thrustParticles[i];
+
+                if(particle) {
+                    particle.size = Math.sin(particle.life * Math.PI) * 5;
+                    particle.x += Math.cos(particle.angle);
+                    particle.y += Math.sin(particle.angle);
+                }
+            });
+        });
 
         world.render();
     });
 
     world.subscribe('beforeRender', function() {
-        for(var i in thrustParticles) {
-            var particle = thrustParticles[i];
-            if(particle) {
-                context.fillStyle = 'salmon';
-                context.beginPath();
-                context.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-                context.closePath();
-                context.fill();
-            }
-        }
+        players.forEach(function(player, i) {
+            player.thrustParticles.forEach(function(particle, i) {
+                if(particle) {
+                    context.fillStyle = 'salmon';
+                    context.beginPath();
+                    context.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                    context.closePath();
+                    context.fill();
+                }
+            });
+        });
     });
 
     world.subscribe('collisions:detected', function( data ){
@@ -167,9 +177,9 @@ Physics({
         for (var i = 0, l = data.collisions.length; i < l; i++){
             c = data.collisions[ i ];
 
-            var isPlayer = c.bodyA === player || c.bodyB === player;
-            var isBall = c.bodyA.name === 'ball' && c.bodyB.name === 'ball';
-            var isChain = c.bodyA.name === 'chain' && c.bodyB.name === 'chain';
+            // var isPlayer = c.bodyA === player || c.bodyB === player;
+            // var isBall = c.bodyA.name === 'ball' && c.bodyB.name === 'ball';
+            // var isChain = c.bodyA.name === 'chain' && c.bodyB.name === 'chain';
 
             // if(isPlayer && !isBall && !isChain && Math.abs(c.mtv.x + c.mtv.y) > 5)
             //     rigidConstraints.drop();
@@ -183,8 +193,10 @@ Physics({
     });
 
     world.subscribe('collision-pair', function( data ){
-        if(data.bodyA != player && data.bodyB != player) return;
-        var other = data.bodyA == player ? data.bodyB : data.bodyA;
+        if(data.bodyA.name !== 'player' && data.bodyB.name !== 'player') return;
+
+        var other = data.bodyA.name == 'player' ? data.bodyB : data.bodyA;
+        var player = data.bodyA === other ? data.bodyB : data.bodyA;
 
         if(other.name != 'ball' || other.fixed === false) return;
 
